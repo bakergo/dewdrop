@@ -1,0 +1,50 @@
+This serves as a list of requirements for a personal dropbox clone.
+
+1) No concept of a server or client.
+    Each actor in this system should be the same. No 'server' should exist
+2) An arbitrary number of connected clients should receive changes from any
+    given node.
+3) Each node should initiate pulling. No node should be able to push changes to
+    any other node.
+        This addresses issues with security and our needs for
+        cross-platformedness.
+4) Nodes should be able to instantly get changes from other nodes.
+    (how does this work without pushing?)
+    (How do we prevent a cyclical push thing?)
+5) Offline nodes need to be able to sync the backlog of changes.
+6) Data should be prunable after a certain period of time on each client, independently.
+7) Conflicting files should be caught and reported, without interruption in service.
+
+NTH:
+    Files of arbitrary size
+    All files encrypted to access.
+    Full change-for-change history of all files everywhere, even across rebases
+        and other mucking with our history locally.
+    git-like command structure for funtime scriptableness.
+        (sync [opts] command [opts] -> sync-command [opts])
+How does this look to us?
+Subsystems:
+    git for version tracking of files. Each node should keep track of an 
+        independent history of a file. Benefit of this is that any given corrupt
+        node history won't fuck over everything, and there is no real full-stop
+        issued when things start to diverge/be pruned.
+        Drawback is that pruning will do a full edit of history, and that no
+        'master' copy of the history exists. The question of if a master copy
+        can exist when subject to pruning is another issue.
+        We might have some success using the packfiles directly.
+    rsync for synchronization between nodes.
+        librsync is another option -- We could use the diffs directly from 
+        rsync to create a patch in git, and use that. Look ma, full history?
+        We might need to fuck with C on this one.
+    ssh for transport mechanism
+Custom modules are the 'glue'. From this I can see:
+    daemon to listen for events in our files and create a change.
+    daemon to listen for changes and notify our clientele about them.
+    daemon to listen for events from our clientele and pull them into ours.
+    interface to edit our history, revert changes.
+
+    Among the sub-components are:
+        Control and tracking for git repository and file changes
+        Control and tracking for client registration, etc.
+        Execution of subsystem projects.
+
