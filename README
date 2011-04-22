@@ -2,18 +2,26 @@ This serves as a list of requirements for a personal dropbox clone.
 
 1) No concept of a server or client.
     Each actor in this system should be the same. No 'server' should exist
-2) An arbitrary number of connected clients should receive changes from any
-    given node.
-3) Each node should initiate pulling. No node should be able to push changes to
-    any other node.
-        This addresses issues with security and our needs for
-        cross-platformedness.
-4) Nodes should be able to instantly get changes from other nodes.
-    (how does this work without pushing?)
-    (How do we prevent a cyclical push thing?)
-5) Offline nodes need to be able to sync the backlog of changes.
-6) Data should be prunable after a certain period of time on each client, independently.
-7) Conflicting files should be caught and reported, without interruption in service.
+2) An arbitrary number of clients can receive changes from any given node.
+3) Multiple folders on a single machine should be kept track of independently
+        Each can have multiple differing clients
+        Each can be synchronized independently.
+        Each can be configured independently.
+        Folder location should be local to the machine.
+4) A mechanism should exist to lock out unwanted clients from watching a given
+    folder for changes. Information shouldn't leak; a denied folder should
+    look the same as a non-permissioned folder.
+5) Nodes should be able to instantly get changes from other nodes.
+        Can we do this without pushing changes?
+        How do we prevent a cyclical push? do we care?
+6) Offline nodes need to be able to sync the backlog of changes when they come
+    online.
+7) Expired data should be pruned.
+        Expired could mean after X amount of time, or X changes, or X size...
+8) Mutually edited files should be caught and reported, or at least recoverable
+    with no interruption in service.
+9) Because this is to work on multiple machines, we should be ownership, group,
+    etc. agnostic.
 
 NTH:
     Files of arbitrary size
