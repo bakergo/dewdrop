@@ -55,3 +55,39 @@ Custom modules are the 'glue'. From this I can see:
         Control and tracking for client registration, etc.
         Execution of subsystem projects.
 
+
+So here's how we should probably look at the sequence:
+
+User edits a file (Assume text)
+We detect this. After a given period of time, bunch the changes together and
+create a commit in our local repository.
+Once we've committed, say 'HEY YOU GUYS' to our list of connected clients.
+We have no connected clients. End.
+
+I boot up my laptop. The client connects.
+We note that we've changed since the client last connected
+Send the client a sync notice.
+
+Meanwhile, on the client:
+    The client connects.
+    We register the server as a client.
+    We receive a sync notice.
+    Use rdiff-like bit over ssh to get the diff of the tree and create a patch.
+    We apply this patch to our current working tree (git apply)
+    The client sends a sync notice to his clients.
+    (Optimize this bit away?)
+        The server uses rdiff-like bit over ssh to get the diff
+            The server notes that nothing has changed.
+    The client then happily sits around waiting for something.
+
+Considerations:
+    Information will necessarily be leaked in the sync notices. How to limit?
+    Real basic sync notice should be sent at first. i.e. repo <ID> has changed.
+    AES or equivalent should be used for sending anything sensitive.
+    AES or equivalent keepalives should be sent to keep transport hijackings
+        to a minimum.
+    Should we include a key negotiation step in the initial part?
+    We need to identify several things:
+        1) Where is the repository of a given id?
+        2) Is there a transactional mechanism for this?
+        3) Is it possible to get the set of changes without a shell?
