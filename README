@@ -41,10 +41,9 @@ Subsystems:
         can exist when subject to pruning is another issue.
         We might have some success using the packfiles directly.
     rsync for synchronization between nodes.
-        librsync is another option -- We could use the diffs directly from 
-        rsync to create a patch in git, and use that. Look ma, full history?
-        We might need to fuck with C on this one.
-    ssh for transport mechanism
+        rdiff is another option -- We could use the diffs directly from 
+        rdiff to create a patch, then apply that to git. Look ma, full history?
+    inotify for listening for file changes.
 Custom modules are the 'glue'. From this I can see:
     daemon to listen for events in our files and create a change.
     daemon to listen for changes and notify our clientele about them.
