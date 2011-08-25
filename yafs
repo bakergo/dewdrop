@@ -1,0 +1,114 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+# Copyright 2011, Greg Baker.
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+""" No bullshit distributed dropbox clone """
+
+import sys, os
+import optparse
+import subprocess
+
+#import sqlite3
+#import datetime
+#import collections
+#import re
+#import tempfile
+
+TREE_NAME='.yafs'
+
+class BadWorkingTree(Exception):
+	def __init__(self, value):
+		self.value = value
+	def __str__(self):
+		return repr(self.value)
+
+def is_tree(directory):
+	while not ismount(directory):
+		for subdir in listdir(directory):
+			if TREE_NAME in subdir:
+				return True
+		directory = os.dirpath(directory)
+	for subdir in listdir(directory):
+		if TREE_NAME in subdir:
+				return True
+	return False
+
+def get_root(directory):
+	""" return the root directory (our working tree) """
+	while not ismount(directory):
+		for subdir in listdir(directory):
+			if TREE_NAME in subdir:
+				return subdir
+		directory = os.dirpath(directory)
+	for subdir in listdir(directory):
+		if TREE_NAME in subdir:
+			return subdir
+	raise BadWorkingTree('This directory is not a valid working tree')
+	
+def init(opts, args):
+	""" Generate a yafs directory """
+	""" TODO: Catch OSError """
+	if (len(args) != 0):
+		directory = args[0]
+	else:
+		directory = os.getcwd()
+	if is_tree(directory):
+		raise BadWorkingTree('%s is already a working tree! bailing out.')
+	os.mkdir(os.path.join(directory, TREE_NAME))
+	os.mkdir(os.path.join(directory, TREE_NAME, 'backup'))
+	os.mkdir(os.path.join(directory, TREE_NAME, 'remotes'))
+	os.mkdir(os.path.join(directory, TREE_NAME, 'tmp'))
+	os.mkdir(os.path.join(directory, TREE_NAME, 'tmp', 'sync'))
+
+def main():
+    """Run through the arguments, then run through user input until we're out"""
+    optparser = optparse.OptionParser(
+        usage='%prog [Options]',
+        version='%prog 0.0')
+    (options, args) = optparser.parse_args()
+    if (len(args) == 0 or args[0] is 'help'):
+        optparser.print_help()
+        return 0
+	command = args[0]
+	commands = {
+		'init' : init,
+		'increment' : increment,
+		'push' : push,
+		#'pull' : pull,
+		'list' : list_incr,
+		'checkout' : checkout,
+		#'sync' : sync,
+		#'daemon' : daemon,
+		#'ping' : ping
+	}
+
+	try:
+		if command in commands:
+			commands[command](options, args[1:])
+		else:
+			pass
+			# Try a subprocess?
+	except:
+# TODO: catch error for bad wd
+# TODO: catch error for 
+
+if(__name__ == "__main__"):
+    sys.exit(main())

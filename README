@@ -8,23 +8,19 @@ This serves as a list of requirements for a personal dropbox clone.
         Each can be synchronized independently.
         Each can be configured independently.
         Folder location should be local to the machine.
-4) A mechanism should exist to lock out unwanted clients from watching a given
-    folder for changes. Information shouldn't leak; a denied folder should
-    look the same as a non-permissioned folder.
-5) Nodes should be able to instantly get changes from other nodes.
+4) Nodes should be able to instantly get changes from other nodes.
         Can we do this without pushing changes?
         How do we prevent a cyclical push? do we care?
-6) Offline nodes need to be able to sync the backlog of changes when they come
+5) Offline nodes need to be able to sync the backlog of changes when they come
     online.
-7) Expired data should be pruned.
+6) Expired data should be pruned.
         Expired could mean after X amount of time, or X changes, or X size...
-8) Mutually edited files should be caught and reported, or at least recoverable
+7) Mutually edited files should be caught and reported, or at least recoverable
     with no interruption in service.
-9) Because this is to work on multiple machines, we should be ownership, group,
+8) Because this is to work on multiple machines, we should be ownership, group,
     etc. agnostic.
 
 NTH:
-    Files of arbitrary size
     All files encrypted to access.
     Full change-for-change history of all files everywhere, even across rebases
         and other mucking with our history locally.
@@ -32,62 +28,37 @@ NTH:
         (sync [opts] command [opts] -> sync-command [opts])
 How does this look to us?
 Subsystems:
-    git for version tracking of files. Each node should keep track of an 
-        independent history of a file. Benefit of this is that any given corrupt
-        node history won't fuck over everything, and there is no real full-stop
-        issued when things start to diverge/be pruned.
-        Drawback is that pruning will do a full edit of history, and that no
-        'master' copy of the history exists. The question of if a master copy
-        can exist when subject to pruning is another issue.
-        We might have some success using the packfiles directly.
-    rsync for synchronization between nodes.
-        rdiff is another option -- We could use the diffs directly from 
-        rdiff to create a patch, then apply that to git. Look ma, full history?
     inotify for listening for file changes.
-Custom modules are the 'glue'. From this I can see:
-    daemon to listen for events in our files and create a change.
-    daemon to listen for changes and notify our clientele about them.
-    daemon to listen for events from our clientele and pull them into ours.
-    interface to edit our history, revert changes.
+	rdiff-backup for version tracking of files. Each node should keep track of
+		an independent history of a file. Benefit of this is that any given
+		corrupt node history won't fuck over everything, and there is no real
+		full-stop issue when things start to diverge and prune.
+    rsync for synchronization between nodes.
+		rsync using --delay-updates and --partial-dir to make updates atomic
+		use --exclude .yafs to exclude our dropbox thing.
+		use --delay-updates to make updates atomic.
+		use --delete-delay to delete files from the dest
+			this could cause data loss if they've got a pending update, but fu.
+		use -stlurp to only update out-of-date ones.
+		Note that deletions are fucking dangerous as shit this way (we should have history, so meh).
+		Also, we could do something FUN and fucking only go one way and shit.
 
-    Among the sub-components are:
-        Control and tracking for git repository and file changes
-        Control and tracking for client registration, etc.
-        Execution of subsystem projects.
+Command structure
+	yafs init -- create a new yafs directory here.
+		Also register something with crontab somehow. (in user crontab?)
+		yafs directory structure should be something like:
+			.yafs/backup/ -- rdiff backups
+			.yafs/config -- config information
+			.yafs/remotes -- remote server configuration
+			.yafs/tmp/sync -- rsync tempdir
 
+	yafs increment -- create a new increment.
+	yafs push -- push changes to all remotes
+	yafs pull -- pull changes from remotes
+	yafs list -- list all increments - can be done with rdiff-backup temporarily.
+	yafs checkout -- check out an increment
+	yafs help -- print some fucking message
+	yafs sync -- run increment, then push changes to all remotes
+	yafs daemon -- watch directories for changes & increment immediately
+	yafs ping -- check if the remote hosts are online
 
-So here's how we should probably look at the sequence:
-
-User edits a file (Assume text)
-We detect this. After a given period of time, bunch the changes together and
-create a commit in our local repository.
-Once we've committed, say 'HEY YOU GUYS' to our list of connected clients.
-We have no connected clients. End.
-
-I boot up my laptop. The client connects.
-We note that we've changed since the client last connected
-Send the client a sync notice.
-
-Meanwhile, on the client:
-    The client connects.
-    We register the server as a client.
-    We receive a sync notice.
-    Use rdiff-like bit over ssh to get the diff of the tree and create a patch.
-    We apply this patch to our current working tree (git apply)
-    The client sends a sync notice to his clients.
-    (Optimize this bit away?)
-        The server uses rdiff-like bit over ssh to get the diff
-            The server notes that nothing has changed.
-    The client then happily sits around waiting for something.
-
-Considerations:
-    Information will necessarily be leaked in the sync notices. How to limit?
-    Real basic sync notice should be sent at first. i.e. repo <ID> has changed.
-    AES or equivalent should be used for sending anything sensitive.
-    AES or equivalent keepalives should be sent to keep transport hijackings
-        to a minimum.
-    Should we include a key negotiation step in the initial part?
-    We need to identify several things:
-        1) Where is the repository of a given id?
-        2) Is there a transactional mechanism for this?
-        3) Is it possible to get the set of changes without a shell?
