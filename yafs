@@ -25,90 +25,267 @@
 import sys, os
 import optparse
 import subprocess
+import sqlite3
+import collections
 
-#import sqlite3
 #import datetime
-#import collections
 #import re
 #import tempfile
 
-TREE_NAME='.yafs'
+TREE_NAME = '.yafs'
 
-class BadWorkingTree(Exception):
-	def __init__(self, value):
-		self.value = value
-	def __str__(self):
-		return repr(self.value)
+class PrinterException(Exception):
+    """ A simple exception that prints itself out. """
+    def __init__(self, value):
+        Exception(self)
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+    
+class BadWorkingTree(PrinterException):
+    """ An exception that involves a working tree somehow. """
+    pass
+
+class InvalidArguments(Exception):
+    """ An exception that signifies an error with a command """
+    pass
+
+class Remote(collections.namedtuple('Remote', 'id name path')):
+    pass
+
+class RemoteORM:
+    """
+    Sits atop the remote db and manages application interaction with it.
+    """
+    BUILD = '''
+    CREATE TABLE IF NOT EXISTS Remotes(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        path TEXT);
+    '''
+    CREATE = '''
+        INSERT INTO Remotes(name, path)
+        VALUES(:name, :path)
+    '''
+    READ = '''
+        SELECT id, name, path
+        FROM Remotes
+        WHERE id = :id
+    '''
+    READ_ALL = '''
+        SELECT id, name, path
+        FROM Remotes
+    '''
+    UPDATE = '''
+        UPDATE Remotes
+        SET name = :name, path = :path
+        WHERE id = :id
+    '''
+    DELETE = 'DELETE FROM Remotes WHERE name = :name'
+
+    def __init__(self, dbpath):
+        """ Set up our db if needed """
+        print dbpath
+        self.sqldb = sqlite3.connect(dbpath,
+            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+        self.sqldb.execute(RemoteORM.BUILD)
+        self.sqldb.commit()
+
+    def __enter__(self):
+        """ For use in with() statements. """
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """ Commit if we're a success, rollback otherwise. """
+        if traceback is None:
+            self.sqldb.commit()
+        else:
+            self.sqldb.rollback()
+
+    def create(self, remote):
+        """ Create a new remote object as good as new """
+        self.sqldb.execute(RemoteORM.CREATE, remote._asdict())
+
+    def readall(self):
+        """ Read all items currently in the db """
+        rows = self.sqldb.execute(RemoteORM.READ_ALL).fetchall()
+        return [Remote._make(row) for row in rows]
+
+    def read(self, key):
+        """ Read a single item by key """
+        rows = self.sqldb.execute(RemoteORM.READ, {'id': key}).fetchall()
+        return [Remote.make(row) for row in rows][:1]
+
+    def delete(self, name):
+        """ Delete the given item referenced by name """
+        return self.sqldb.execute(RemoteORM.DELETE, {'name': name})
+
+    def update(self, remote):
+        """ Update the reference to the given item """
+        self.sqldb.execute(RemoteORM.UPDATE, remote._asdict())
 
 def is_tree(directory):
-	while not ismount(directory):
-		for subdir in listdir(directory):
-			if TREE_NAME in subdir:
-				return True
-		directory = os.dirpath(directory)
-	for subdir in listdir(directory):
-		if TREE_NAME in subdir:
-				return True
-	return False
+    """ Determine if we're in a working tree. """
+    while not os.path.ismount(directory):
+        for subdir in os.listdir(directory):
+            if TREE_NAME == os.path.basename(subdir):
+                return True
+        directory = os.path.dirname(directory)
+    for subdir in os.listdir(directory):
+        if TREE_NAME == os.path.basename(subdir):
+            return True
+    return False
 
 def get_root(directory):
-	""" return the root directory (our working tree) """
-	while not ismount(directory):
-		for subdir in listdir(directory):
-			if TREE_NAME in subdir:
-				return subdir
-		directory = os.dirpath(directory)
-	for subdir in listdir(directory):
-		if TREE_NAME in subdir:
-			return subdir
-	raise BadWorkingTree('This directory is not a valid working tree')
-	
+    """ return the root directory (our working tree) """
+    while not os.path.ismount(directory):
+        for subdir in os.listdir(directory):
+            if TREE_NAME == os.path.basename(subdir):
+                return os.path.abspath(subdir)
+        directory = os.path.dirname(directory)
+    for subdir in os.listdir(directory):
+        if TREE_NAME == os.path.basename(subdir):
+            return os.path.abspath(subdir)
+    raise BadWorkingTree('This directory is not a valid working tree')
+    
 def init(opts, args):
-	""" Generate a yafs directory """
-	""" TODO: Catch OSError """
-	if (len(args) != 0):
-		directory = args[0]
-	else:
-		directory = os.getcwd()
-	if is_tree(directory):
-		raise BadWorkingTree('%s is already a working tree! bailing out.')
-	os.mkdir(os.path.join(directory, TREE_NAME))
-	os.mkdir(os.path.join(directory, TREE_NAME, 'backup'))
-	os.mkdir(os.path.join(directory, TREE_NAME, 'remotes'))
-	os.mkdir(os.path.join(directory, TREE_NAME, 'tmp'))
-	os.mkdir(os.path.join(directory, TREE_NAME, 'tmp', 'sync'))
+    """ Generate a yafs directory """
+    """ TODO: Catch OSError """
+    if is_tree(opts.directory):
+        raise BadWorkingTree('%s is already a working tree! bailing out.')
+    os.mkdir(os.path.join(opts.directory, TREE_NAME))
+    os.mkdir(os.path.join(opts.directory, TREE_NAME, 'backup'))
+    os.mkdir(os.path.join(opts.directory, TREE_NAME, 'sync'))
 
-def main():
-    """Run through the arguments, then run through user input until we're out"""
+def increment(opts, args):
+    """ Generate a new rdiff-backup incremental backup """
+    subprocess.check_call(['rdiff-backup',
+        '--exclude', opts.tree,
+        opts.directory,
+        opts.backup])
+
+def remote(opts, args):
+    """
+    Add or remove references to remote servers.
+    """
+    def usage():
+        """ Print how to use this then raise an exception """
+        print 'yafs remote add name rsync_path'
+        print 'yafs remote remove name'
+        print 'yafs remote list'
+        raise InvalidArguments('remote')
+    if args:
+        command = args[0]
+    else:
+        usage()
+
+    with RemoteORM(opts.remote) as remote_db:
+        if command == 'add':
+            if len(args) >= 3:
+                remote_db.create(Remote(id=0, name=args[1], path=args[2]))
+            else:
+                usage()
+        elif command == 'remove': 
+            if len(args) >= 2:
+                remote_db.delete(args[1])
+            else:
+                usage()
+        elif command == 'list':
+            for remote in remote_db.readall():
+                print "%s %s" % (remote.name, remote.path)
+        else:
+            usage()
+
+def get_remotes(opts, args):
+    """
+    Retrieve a list of remote servers from internal storage.
+    """
+    with RemoteORM(opts.remote) as remote_db:
+        return remote_db.readall()
+
+def push(opts, args):
+    """
+    Push to each of the remote servers this directory.
+    Remote folders are set in the .yafs directory.
+    """
+    for remote in get_remotes(opts, args):
+        subprocess.check_call(['rsync',
+            '--delay-updates',
+            '--delete-delay',
+            '--partial-dir', os.path.join(remote.path, TREE_NAME, 'sync'),
+            '--exclude', opts.tree,
+            '-slurpt',
+            opts.directory,
+            remote.path])
+
+def get_options():
+    """ Retrieve and parse command-line options into options and arguments """
     optparser = optparse.OptionParser(
         usage='%prog [Options]',
         version='%prog 0.0')
     (options, args) = optparser.parse_args()
-    if (len(args) == 0 or args[0] is 'help'):
+    if (len(args) == 0 or args[0] == 'help'):
         optparser.print_help()
-        return 0
-	command = args[0]
-	commands = {
-		'init' : init,
-		'increment' : increment,
-		'push' : push,
-		#'pull' : pull,
-		'list' : list_incr,
-		'checkout' : checkout,
-		#'sync' : sync,
-		#'daemon' : daemon,
-		#'ping' : ping
-	}
+        sys.exit(0)
+    command = args[0]
+    print command
+    options.command = command
+    if options.command == 'init':
+        if len(args) == 2:
+            options.directory = args[1]
+        else:
+            options.directory = os.getcwd()
+    else:
+        options.tree = get_root(os.getcwd())
+        options.directory = os.path.dirname(options.tree)
+        options.backup = os.path.join(options.tree, 'backup')
+        options.remote = os.path.join(options.tree, 'remotes')
 
-	try:
-		if command in commands:
-			commands[command](options, args[1:])
-		else:
-			pass
-			# Try a subprocess?
-	except:
-# TODO: catch error for bad wd
-# TODO: catch error for 
+    return (options, args[1:])
+
+def list_incr(opts, args):
+    """ List the available increments """
+    # FIXME: Implement this guy.
+    pass
+
+def checkout(opts, args):
+    """ Rollback to a prior increment """
+    # FIXME: Implement this guy.
+    pass
+
+def main():
+    """Run through the arguments, then run through user input until we're out"""
+    (opts, args) = get_options()
+    commands = {
+        'init' : init,
+        'increment' : increment,
+        'push' : push,
+        'remote' : remote,
+        #'pull' : pull,
+        'list' : list_incr,
+        'checkout' : checkout,
+        #'sync' : sync,
+        #'daemon' : daemon,
+        #'ping' : ping
+    }
+
+    try:
+        if opts.command in commands:
+            commands[opts.command](opts, args)
+        else:
+            pass
+            # Try a subprocess?
+    except BadWorkingTree as exc:
+        print "bad working tree: ", exc
+    except InvalidArguments as exc:
+        print "Couldn't recognize your command: ", exc
+        
+# TODO catch the CalledProcessError from increment
+# TODO catch the OSError
+# TODO catch ValueError
+# TODO catch InvalidArguments
+# TODO catch BadWorkingTree
 
 if(__name__ == "__main__"):
     sys.exit(main())
+
