@@ -25,19 +25,20 @@
 import sys, os
 import optparse
 import subprocess
-import sqlite3
 import collections
+import ConfigParser
 
 #import datetime
 #import re
 #import tempfile
+#import sqlite3
 
 TREE_NAME = '.yafs'
 
 class PrinterException(Exception):
     """ A simple exception that prints itself out. """
     def __init__(self, value):
-        Exception(self)
+        Exception.__init__(self)
         self.value = value
     def __str__(self):
         return repr(self.value)
@@ -50,79 +51,28 @@ class InvalidArguments(Exception):
     """ An exception that signifies an error with a command """
     pass
 
-class Remote(collections.namedtuple('Remote', 'id name path')):
+class Remote(collections.namedtuple('Remote', 'name url')):
     pass
 
-class RemoteORM:
-    """
-    Sits atop the remote db and manages application interaction with it.
-    """
-    BUILD = '''
-    CREATE TABLE IF NOT EXISTS Remotes(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT,
-        path TEXT);
-    '''
-    CREATE = '''
-        INSERT INTO Remotes(name, path)
-        VALUES(:name, :path)
-    '''
-    READ = '''
-        SELECT id, name, path
-        FROM Remotes
-        WHERE id = :id
-    '''
-    READ_ALL = '''
-        SELECT id, name, path
-        FROM Remotes
-    '''
-    UPDATE = '''
-        UPDATE Remotes
-        SET name = :name, path = :path
-        WHERE id = :id
-    '''
-    DELETE = 'DELETE FROM Remotes WHERE name = :name'
+class RemoteConfig(ConfigParser.RawConfigParser):
+    def __init__(self, remotefile):
+        ConfigParser.RawConfigParser.__init__(self)
+        self.readfp(remotefile)
+        self.remotes = []
+        for section in self.sections():
+            if self.has_option(section, 'url'):
+                name = section
+                url = self.get(section, 'url')
+                self.remotes.append(Remote(name=name, url=url))
 
-    def __init__(self, dbpath):
-        """ Set up our db if needed """
-        print dbpath
-        self.sqldb = sqlite3.connect(dbpath,
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
-        self.sqldb.execute(RemoteORM.BUILD)
-        self.sqldb.commit()
+    def add(self, remote):
+        if not self.has_section(remote.name):
+            self.add_section(remote.name)
+        self.set(remote.name, 'url', remote.url)
 
-    def __enter__(self):
-        """ For use in with() statements. """
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """ Commit if we're a success, rollback otherwise. """
-        if traceback is None:
-            self.sqldb.commit()
-        else:
-            self.sqldb.rollback()
-
-    def create(self, remote):
-        """ Create a new remote object as good as new """
-        self.sqldb.execute(RemoteORM.CREATE, remote._asdict())
-
-    def readall(self):
-        """ Read all items currently in the db """
-        rows = self.sqldb.execute(RemoteORM.READ_ALL).fetchall()
-        return [Remote._make(row) for row in rows]
-
-    def read(self, key):
-        """ Read a single item by key """
-        rows = self.sqldb.execute(RemoteORM.READ, {'id': key}).fetchall()
-        return [Remote.make(row) for row in rows][:1]
-
-    def delete(self, name):
-        """ Delete the given item referenced by name """
-        return self.sqldb.execute(RemoteORM.DELETE, {'name': name})
-
-    def update(self, remote):
-        """ Update the reference to the given item """
-        self.sqldb.execute(RemoteORM.UPDATE, remote._asdict())
+    def remove(self, name):
+        if self.has_section(name):
+            self.remove_section(name)
 
 def is_tree(directory):
     """ Determine if we're in a working tree. """
@@ -156,6 +106,8 @@ def init(opts, args):
     os.mkdir(os.path.join(opts.directory, TREE_NAME))
     os.mkdir(os.path.join(opts.directory, TREE_NAME, 'backup'))
     os.mkdir(os.path.join(opts.directory, TREE_NAME, 'sync'))
+    rconf = open(os.path.join(opts.directory, TREE_NAME, 'remotes'), 'w+')
+    rconf.close()
 
 def increment(opts, args):
     """ Generate a new rdiff-backup incremental backup """
@@ -179,29 +131,35 @@ def remote(opts, args):
     else:
         usage()
 
-    with RemoteORM(opts.remote) as remote_db:
-        if command == 'add':
-            if len(args) >= 3:
-                remote_db.create(Remote(id=0, name=args[1], path=args[2]))
-            else:
-                usage()
-        elif command == 'remove': 
-            if len(args) >= 2:
-                remote_db.delete(args[1])
-            else:
-                usage()
-        elif command == 'list':
-            for remote in remote_db.readall():
-                print "%s %s" % (remote.name, remote.path)
+    with open(opts.remote) as remotefile:
+        rconf = RemoteConfig(remotefile)
+
+    if command == 'add':
+        if len(args) >= 3:
+            rconf.add(Remote(name=args[1], url=args[2]))
+            with open(opts.remote, 'w+') as remotefile:
+                rconf.write(remotefile)
         else:
             usage()
+    elif command == 'remove': 
+        if len(args) >= 2:
+            rconf.remove(args[1])
+            with open(opts.remote, 'w+') as remotefile:
+                rconf.write(remotefile)
+        else:
+            usage()
+    elif command == 'list':
+        for remote in rconf.remotes:
+            print "%s %s" % (remote.name, remote.url)
+    else:
+        usage()
 
 def get_remotes(opts, args):
     """
     Retrieve a list of remote servers from internal storage.
     """
-    with RemoteORM(opts.remote) as remote_db:
-        return remote_db.readall()
+    with open(opts.remote) as remotefile:
+        return RemoteConfig(remotefile).remotes[:]
 
 def push(opts, args):
     """
@@ -212,11 +170,11 @@ def push(opts, args):
         subprocess.check_call(['rsync',
             '--delay-updates',
             '--delete-delay',
-            '--partial-dir', os.path.join(remote.path, TREE_NAME, 'sync'),
+            '--partial-dir', os.path.join(remote.url, TREE_NAME, 'sync'),
             '--exclude', opts.tree,
             '-slurpt',
             opts.directory,
-            remote.path])
+            remote.url])
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -253,6 +211,7 @@ def checkout(opts, args):
     # FIXME: Implement this guy.
     pass
 
+
 def main():
     """Run through the arguments, then run through user input until we're out"""
     (opts, args) = get_options()
@@ -260,10 +219,11 @@ def main():
         'init' : init,
         'increment' : increment,
         'push' : push,
-        'remote' : remote,
         #'pull' : pull,
+        'remote' : remote,
         'list' : list_incr,
         'checkout' : checkout,
+        #'clone' : clone,
         #'sync' : sync,
         #'daemon' : daemon,
         #'ping' : ping
