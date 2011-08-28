@@ -165,35 +165,33 @@ def get_remotes(opts, args):
     with open(opts.remote) as remotefile:
         return RemoteConfig(remotefile).remotes[:]
 
+def rsync(src, dest):
+    subprocess.check_call(['rsync',
+        '--delay-updates',
+        #'--delete-delay',
+        '--partial-dir=%s' % (os.path.join(dest, '.yafsync')),
+        '--exclude', TREE_NAME,
+        '-slurpt',
+        os.path.join(src, ''),
+        os.path.join(dest, '')])
+
 def push(opts, args):
     """
     Push to each of the remote servers this directory.
     Remote folders are set with the .yafs command
     """
+    # TODO Pick a remote based on name
     for remote in get_remotes(opts, args):
-        subprocess.check_call(['rsync',
-            '--delay-updates',
-            '--delete-delay',
-            '--partial-dir', os.path.join(remote.url, TREE_NAME, 'sync'),
-            '--exclude', opts.tree,
-            '-slurpt',
-            opts.directory,
-            remote.url])
+        rsync(opts.directory, remote.url)
 
 def pull(opts, args):
     """
     Pull from each of the remote servers of this directory.
     Remote folders are set with the .yafs command
     """
+    # TODO pick a remote based on name
     for remote in get_remotes(opts, args):
-        subprocess.check_call(['rsync',
-            '--delay-updates',
-            '--delete-delay',
-            '--partial-dir', os.path.join(remote.url, TREE_NAME, 'sync'),
-            '--exclude', opts.tree,
-            '-slurpt',
-            remote.url,
-            opts.directory])
+        rsync(remote.url, opts.directory)
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -227,7 +225,6 @@ def sync(opts, args):
     increment(opts, args)
     push(opts, args)
     pull(opts, args)
-    increment(opts, args)
 
 def clone(opts, args):
     """
@@ -249,10 +246,10 @@ def main():
         'push' : push,
         'pull' : pull,
         'remote' : remote,
+        'sync' : sync,
         #'list' : list_incr,
         #'checkout' : checkout,
         #'clone' : clone,
-        'sync' : sync,
         #'daemon' : daemon,
         #'ping' : ping
     }
