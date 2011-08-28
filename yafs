@@ -32,6 +32,10 @@ import ConfigParser
 #import re
 #import tempfile
 #import sqlite3
+# TODO Break out each command to a git like command structure
+# TODO Handle configuration in ~/.yafs.d/config
+# TODO Maintain a global list of yafs dirs in .yafs.d
+# TODO Create a yafs-daemon to handle synchronizing each of the dirs.
 
 TREE_NAME = '.yafs'
 
@@ -164,7 +168,7 @@ def get_remotes(opts, args):
 def push(opts, args):
     """
     Push to each of the remote servers this directory.
-    Remote folders are set in the .yafs directory.
+    Remote folders are set with the .yafs command
     """
     for remote in get_remotes(opts, args):
         subprocess.check_call(['rsync',
@@ -175,6 +179,21 @@ def push(opts, args):
             '-slurpt',
             opts.directory,
             remote.url])
+
+def pull(opts, args):
+    """
+    Pull from each of the remote servers of this directory.
+    Remote folders are set with the .yafs command
+    """
+    for remote in get_remotes(opts, args):
+        subprocess.check_call(['rsync',
+            '--delay-updates',
+            '--delete-delay',
+            '--partial-dir', os.path.join(remote.url, TREE_NAME, 'sync'),
+            '--exclude', opts.tree,
+            '-slurpt',
+            remote.url,
+            opts.directory])
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -201,16 +220,25 @@ def get_options():
 
     return (options, args[1:])
 
-def list_incr(opts, args):
-    """ List the available increments """
-    # FIXME: Implement this guy.
-    pass
+def sync(opts, args):
+    """ 
+    Synchronize this folder with each of the others.
+    """
+    increment(opts, args)
+    push(opts, args)
+    pull(opts, args)
+    increment(opts, args)
 
-def checkout(opts, args):
-    """ Rollback to a prior increment """
-    # FIXME: Implement this guy.
+def clone(opts, args):
+    """
+    Creates a new folder with contents cloned from the given path, referencing
+    that path
+    """
     pass
-
+# TODO init
+# TODO add remote
+# TODO pull
+# TODO increment
 
 def main():
     """Run through the arguments, then run through user input until we're out"""
@@ -219,12 +247,12 @@ def main():
         'init' : init,
         'increment' : increment,
         'push' : push,
-        #'pull' : pull,
+        'pull' : pull,
         'remote' : remote,
-        'list' : list_incr,
-        'checkout' : checkout,
+        #'list' : list_incr,
+        #'checkout' : checkout,
         #'clone' : clone,
-        #'sync' : sync,
+        'sync' : sync,
         #'daemon' : daemon,
         #'ping' : ping
     }
