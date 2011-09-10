@@ -6,9 +6,9 @@
 
 import sys, os
 import optparse
-import subprocess
-import collections
-import ConfigParser
+import lib.external as external
+import lib.remote as remote
+import lib.tree as tree
 
 #import datetime
 #import re
@@ -19,90 +19,19 @@ import ConfigParser
 # TODO Maintain a global list of yafs dirs in .yafs.d
 # TODO Create a yafs-daemon to handle synchronizing each of the dirs.
 
-TREE_NAME = '.yafs'
-
-class PrinterException(Exception):
-    """ A simple exception that prints itself out. """
-    def __init__(self, value):
-        Exception.__init__(self)
-        self.value = value
-    def __str__(self):
-        return repr(self.value)
-    
-class BadWorkingTree(PrinterException):
-    """ An exception that involves a working tree somehow. """
-    pass
-
 class InvalidArguments(Exception):
     """ An exception that signifies an error with a command """
     pass
 
-class Remote(collections.namedtuple('Remote', 'name url')):
-    pass
-
-class RemoteConfig(ConfigParser.RawConfigParser):
-    def __init__(self, remotefile):
-        ConfigParser.RawConfigParser.__init__(self)
-        self.readfp(remotefile)
-        self.remotes = []
-        for section in self.sections():
-            if self.has_option(section, 'url'):
-                name = section
-                url = self.get(section, 'url')
-                self.remotes.append(Remote(name=name, url=url))
-
-    def add(self, remote):
-        if not self.has_section(remote.name):
-            self.add_section(remote.name)
-        self.set(remote.name, 'url', remote.url)
-
-    def remove(self, name):
-        if self.has_section(name):
-            self.remove_section(name)
-
-def is_tree(directory):
-    """ Determine if we're in a working tree. """
-    while not os.path.ismount(directory):
-        for subdir in os.listdir(directory):
-            if TREE_NAME == os.path.basename(subdir):
-                return True
-        directory = os.path.dirname(directory)
-    for subdir in os.listdir(directory):
-        if TREE_NAME == os.path.basename(subdir):
-            return True
-    return False
-
-def get_root(directory):
-    """ return the root directory (our working tree) """
-    while not os.path.ismount(directory):
-        for subdir in os.listdir(directory):
-            if TREE_NAME == os.path.basename(subdir):
-                return os.path.abspath(subdir)
-        directory = os.path.dirname(directory)
-    for subdir in os.listdir(directory):
-        if TREE_NAME == os.path.basename(subdir):
-            return os.path.abspath(subdir)
-    raise BadWorkingTree('This directory is not a valid working tree')
-    
-def init(opts, args):
+def init(env, opts, args):
     """ Generate a yafs directory """
-    """ TODO: Catch OSError """
-    if is_tree(opts.directory):
-        raise BadWorkingTree('%s is already a working tree! bailing out.')
-    os.mkdir(os.path.join(opts.directory, TREE_NAME))
-    os.mkdir(os.path.join(opts.directory, TREE_NAME, 'backup'))
-    os.mkdir(os.path.join(opts.directory, TREE_NAME, 'sync'))
-    rconf = open(os.path.join(opts.directory, TREE_NAME, 'remotes'), 'w+')
-    rconf.close()
+    tree.init(opts.directory)
 
-def increment(opts, args):
+def increment(env, opts, args):
     """ Generate a new rdiff-backup incremental backup """
-    subprocess.check_call(['rdiff-backup',
-        '--exclude', opts.tree,
-        opts.directory,
-        opts.backup])
+    external.backup(env)
 
-def remote(opts, args):
+def remote_cmd(env, opts, args):
     """
     Add or remove references to remote servers.
     """
@@ -117,63 +46,73 @@ def remote(opts, args):
     else:
         usage()
 
-    with open(opts.remote) as remotefile:
-        rconf = RemoteConfig(remotefile)
+    with open(env.remote) as remotefile:
+        rconf = remote.RemoteConfig(remotefile)
 
     if command == 'add':
         if len(args) >= 3:
-            rconf.add(Remote(name=args[1], url=args[2]))
-            with open(opts.remote, 'w+') as remotefile:
+            rconf.add(remote.Remote(name=args[1], url=args[2]))
+            with open(env.remote, 'w+') as remotefile:
                 rconf.write(remotefile)
         else:
             usage()
     elif command == 'remove': 
         if len(args) >= 2:
             rconf.remove(args[1])
-            with open(opts.remote, 'w+') as remotefile:
+            with open(env.remote, 'w+') as remotefile:
                 rconf.write(remotefile)
         else:
             usage()
     elif command == 'list':
-        for remote in rconf.remotes:
-            print "%s %s" % (remote.name, remote.url)
+        for entry in rconf.remotes:
+            print "%s %s" % (entry.name, entry.url)
     else:
         usage()
 
-def get_remotes(opts, args):
-    """
-    Retrieve a list of remote servers from internal storage.
-    """
-    with open(opts.remote) as remotefile:
-        return RemoteConfig(remotefile).remotes[:]
-
-def rsync(src, dest):
-    subprocess.check_call(['rsync',
-        '--delay-updates',
-        #'--delete-delay',
-        '--partial-dir=%s' % (os.path.join(dest, '.yafsync')),
-        '--exclude', TREE_NAME,
-        '-slurpt',
-        os.path.join(src, ''),
-        os.path.join(dest, '')])
-
-def push(opts, args):
+def push(env, opts, args):
     """
     Push to each of the remote servers this directory.
     Remote folders are set with the .yafs command
     """
-    # TODO Pick a remote based on name
-    for remote in get_remotes(opts, args):
-        rsync(opts.directory, remote.url)
+    remotes = remote.get_remotes(env)
+    if args:
+        filt = lambda rmt: rmt.name in args
+    else:
+        filt = lambda rmt: True
+    for entry in filter(filt, remotes):
+        external.rsync(env.directory, entry.url)
 
-def pull(opts, args):
+def pull(env, opts, args):
     """
     Pull from each of the remote servers of this directory.
     Remote folders are set with the .yafs command
     """
-    # TODO pick a remote based on name
-    for remote in get_remotes(opts, args):
-        rsync(remote.url, opts.directory)
+    remotes = remote.get_remotes(env)
+    if args:
+        filt = lambda rmt: rmt.name in args
+    else:
+        filt = lambda rmt: True
+    for entry in filter(filt, remotes):
+        external.rsync(entry.url, env.directory)
+
+def sync(env, opts, args):
+    """ 
+    Synchronize this folder with each of the others.
+    """
+    increment(env, opts, args)
+    push(env, opts, args)
+    pull(env, opts, args)
+
+def clone(env, opts, args):
+    """
+    Creates a new folder with contents cloned from the given path, referencing
+    that path
+    """
+    pass
+# TODO init
+# TODO add remote
+# TODO pull
+# TODO increment
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -185,39 +124,8 @@ def get_options():
         optparser.print_help()
         sys.exit(0)
     command = args[0]
-    print command
     options.command = command
-    if options.command == 'init':
-        if len(args) == 2:
-            options.directory = args[1]
-        else:
-            options.directory = os.getcwd()
-    else:
-        options.tree = get_root(os.getcwd())
-        options.directory = os.path.dirname(options.tree)
-        options.backup = os.path.join(options.tree, 'backup')
-        options.remote = os.path.join(options.tree, 'remotes')
-
     return (options, args[1:])
-
-def sync(opts, args):
-    """ 
-    Synchronize this folder with each of the others.
-    """
-    increment(opts, args)
-    push(opts, args)
-    pull(opts, args)
-
-def clone(opts, args):
-    """
-    Creates a new folder with contents cloned from the given path, referencing
-    that path
-    """
-    pass
-# TODO init
-# TODO add remote
-# TODO pull
-# TODO increment
 
 def main():
     """Run through the arguments, then run through user input until we're out"""
@@ -227,7 +135,7 @@ def main():
         'increment' : increment,
         'push' : push,
         'pull' : pull,
-        'remote' : remote,
+        'remote' : remote_cmd,
         'sync' : sync,
         #'list' : list_incr,
         #'checkout' : checkout,
@@ -236,13 +144,22 @@ def main():
         #'ping' : ping
     }
 
+    env = None
+    if opts.command == 'init':
+        if len(args) == 2:
+            opts.directory = args[1]
+        else:
+            opts.directory = os.getcwd()
+    else:
+        opts.directory = tree.get_root(os.getcwd())
+        env = tree.Environment(opts.directory)
     try:
         if opts.command in commands:
-            commands[opts.command](opts, args)
+            commands[opts.command](env, opts, args)
         else:
             pass
             # Try a subprocess?
-    except BadWorkingTree as exc:
+    except tree.BadWorkingTree as exc:
         print "bad working tree: ", exc
     except InvalidArguments as exc:
         print "Couldn't recognize your command: ", exc
