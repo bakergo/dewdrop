@@ -19,6 +19,11 @@ This serves as a list of requirements for a personal dropbox clone.
     with no interruption in service.
 8) Because this is to work on multiple machines, we should be ownership, group,
     etc. agnostic.
+9) Because forcing people to install rdiff-backup sucks, backing up should use
+    a more NIH-like solution, where we split files up with a rolling checksum,
+    then backup the files using their fragmented chunks. See bup, librsync
+    for more details. [bup suffers from an inability to prune, which is 90%
+    of why I wrote this]
 
 NTH:
     All files encrypted to access.
