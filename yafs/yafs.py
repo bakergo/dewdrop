@@ -153,7 +153,7 @@ def main():
         else:
             opts.directory = os.getcwd()
     else:
-        opts.directory = tree.get_root(yafs_dir);
+        opts.directory = tree.get_root(opts.yafs_dir);
         env = tree.Environment(opts.directory)
     try:
         if opts.command in commands:
