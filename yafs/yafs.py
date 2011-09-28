@@ -25,8 +25,7 @@ class InvalidArguments(Exception):
 
 def init(env, opts, args):
     """ Generate a yafs directory """
-    tree.init(opts.directory)
-    return tree.Environment(opts.directory)
+    return tree.init(opts.directory)
 
 def increment(env, opts, args):
     """ Generate a new rdiff-backup incremental backup """
@@ -110,8 +109,8 @@ def clone(env, opts, args):
     that path
     """
     if len(args) == 1:
-        #opts.directory = opts.yafs_dir
         remotes = args[0]
+        #opts.directory = opts.yafs_dir
     elif len(args) >1:
         opts.directory = args[-1]
         remotes = args[0:-1]
@@ -152,19 +151,20 @@ def main():
         'sync' : sync,
         #'list' : list_incr,
         #'checkout' : checkout,
-        #'clone' : clone,
+        'clone' : clone,
         #'daemon' : daemon,
         #'ping' : ping
     }
 
     env = None
-    if opts.command == 'init':
-        if len(args) == 2:
-            opts.directory = args[1]
+    create_commands = set(['init', 'clone'])
+    if opts.command in create_commands:
+        if len(args) >1:
+            opts.directory = args[-1]
         else:
-            opts.directory = os.getcwd()
+            opts.directory = opts.yafs_dir
     else:
-        opts.directory = tree.get_root(opts.yafs_dir);
+        opts.directory = tree.get_root(opts.yafs_dir)
         env = tree.Environment(opts.directory)
     try:
         if opts.command in commands:

@@ -26,6 +26,8 @@ class Environment:
 
 def is_tree(directory):
     """ Determine if we're in a working tree. """
+    if not os.path.exists(directory):
+        return False
     while not os.path.ismount(directory):
         for subdir in os.listdir(directory):
             if TREE_NAME == os.path.basename(subdir):
@@ -38,14 +40,15 @@ def is_tree(directory):
 
 def get_root(directory):
     """ return the root directory (our working tree) """
+    directory = os.path.abspath(directory)
     while not os.path.ismount(directory):
         for subdir in os.listdir(directory):
             if TREE_NAME == os.path.basename(subdir):
-                return os.path.abspath(subdir)
+                return os.path.abspath(os.path.join(directory, subdir))
         directory = os.path.dirname(directory)
     for subdir in os.listdir(directory):
         if TREE_NAME == os.path.basename(subdir):
-            return os.path.abspath(subdir)
+            return os.path.abspath(os.path.join(directory, subdir))
     raise BadWorkingTree('This directory is not a valid working tree')
 
 def init(directory):
@@ -53,6 +56,8 @@ def init(directory):
     if is_tree(directory):
         raise BadWorkingTree('%s is already a working tree! bailing out.' % 
                 directory)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
     os.mkdir(os.path.join(directory, TREE_NAME))
     os.mkdir(os.path.join(directory, TREE_NAME, 'backup'))
     os.mkdir(os.path.join(directory, TREE_NAME, 'sync'))
