@@ -26,6 +26,7 @@ class InvalidArguments(Exception):
 def init(env, opts, args):
     """ Generate a yafs directory """
     tree.init(opts.directory)
+    return tree.Environment(opts.directory)
 
 def increment(env, opts, args):
     """ Generate a new rdiff-backup incremental backup """
@@ -108,11 +109,21 @@ def clone(env, opts, args):
     Creates a new folder with contents cloned from the given path, referencing
     that path
     """
-    pass
-# TODO init
-# TODO add remote
-# TODO pull
-# TODO increment
+    if len(args) == 1:
+        #opts.directory = opts.yafs_dir
+        remotes = args[0]
+    elif len(args) >1:
+        opts.directory = args[-1]
+        remotes = args[0:-1]
+    env = init(env, opts, args)
+    with open(env.remote) as remotefile:
+        rconf = remote.RemoteConfig(remotefile)
+    for entry in remotes:
+        rconf.add(remote.Remote(name=entry, url=entry))
+    with open(env.remote, 'w+') as remotefile:
+        rconf.write(remotefile)
+    pull(env, opts, remotes)
+    increment(env, opts, remotes)
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
