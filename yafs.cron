@@ -1,0 +1,15 @@
+#!/bin/sh
+# Cron script for syncing up yafs files.
+# Requires the file 'yafs-export-ok' in the current dir
+# -*- coding: utf-8 -*-
+# Copyright 2011, Greg Baker.
+
+YAFS_CONFIG_DIR="$HOME/.yafs.d"
+
+for dir in "YAFS_CONFIG_DIR"/* ; do
+    rawdir=`readlink -f "$dir"`
+    if [ -f "$rawdir/.yafs/yafs-export-ok" ] ; then
+        yafs --yafs-dir "$rawdir" sync
+    fi
+done
+

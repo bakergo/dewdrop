@@ -119,6 +119,8 @@ def get_options():
     optparser = optparse.OptionParser(
         usage='%prog [Options]',
         version='%prog 0.0')
+    optparser.add_option('--yafs-dir', type='string', default=os.getcwd(),
+        help='Specify the working directory.')
     (options, args) = optparser.parse_args()
     if (len(args) == 0 or args[0] == 'help'):
         optparser.print_help()
@@ -151,7 +153,7 @@ def main():
         else:
             opts.directory = os.getcwd()
     else:
-        opts.directory = tree.get_root(os.getcwd())
+        opts.directory = tree.get_root(yafs_dir);
         env = tree.Environment(opts.directory)
     try:
         if opts.command in commands:
