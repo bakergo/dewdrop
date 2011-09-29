@@ -149,9 +149,9 @@ def main():
         'pull' : pull,
         'remote' : remote_cmd,
         'sync' : sync,
+        'clone' : clone,
         #'list' : list_incr,
         #'checkout' : checkout,
-        'clone' : clone,
         #'daemon' : daemon,
         #'ping' : ping
     }
