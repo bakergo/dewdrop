@@ -93,13 +93,13 @@ def pull(env, opts, args):
     else:
         filt = lambda rmt: True
     for entry in filter(filt, remotes):
-        external.rsync(entry.url, env.directory)
+        external.rsync(entry.url, env.directory, backup_dir=env.backup)
 
 def sync(env, opts, args):
     """ 
     Synchronize this folder with each of the others.
     """
-    increment(env, opts, args)
+    #increment(env, opts, args)
     push(env, opts, args)
     pull(env, opts, args)
 
@@ -122,7 +122,7 @@ def clone(env, opts, args):
     with open(env.remote, 'w+') as remotefile:
         rconf.write(remotefile)
     pull(env, opts, remotes)
-    increment(env, opts, remotes)
+    #increment(env, opts, remotes)
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -144,7 +144,7 @@ def main():
     (opts, args) = get_options()
     commands = {
         'init' : init,
-        'increment' : increment,
+        #'increment' : increment,
         'push' : push,
         'pull' : pull,
         'remote' : remote_cmd,

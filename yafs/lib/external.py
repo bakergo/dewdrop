@@ -5,6 +5,7 @@
 ''' Call external command wrappers '''
 
 import subprocess
+import datetime
 import lib.tree as tree
 import os
 
@@ -16,14 +17,15 @@ def backup(wtree):
         wtree.directory,
         wtree.backup])
 
-def rsync(src, dest):
+def rsync(src, dest, backup_dir=None):
     ''' Call rsync with the default parameters to sync the two folders '''
-    subprocess.check_call(['rsync',
-        '--delay-updates',
-        #'--delete-delay',
+    cmd = ['rsync', '--delay-updates', 
         '--partial-dir=%s' % ('.yafsync'),
         '--exclude', tree.TREE_NAME,
-        '-slurpt',
-        os.path.join(src, ''),
-        os.path.join(dest, '')])
+        '-slurpt']
+    if backup_dir:
+        suffix = datetime.datetime.now().strftime('.%Y%m%d-%H%M%S')
+        cmd.extend(['-b', '--suffix', suffix, '--backup-dir', backup_dir])
+    cmd.extend([os.path.join(src, ''), os.path.join(dest, '')])
+    subprocess.check_call(cmd)
 
