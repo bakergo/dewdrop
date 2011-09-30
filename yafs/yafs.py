@@ -27,10 +27,6 @@ def init(env, opts, args):
     """ Generate a yafs directory """
     return tree.init(opts.directory)
 
-def increment(env, opts, args):
-    """ Generate a new rdiff-backup incremental backup """
-    external.backup(env)
-
 def remote_cmd(env, opts, args):
     """
     Add or remove references to remote servers.
@@ -99,7 +95,6 @@ def sync(env, opts, args):
     """ 
     Synchronize this folder with each of the others.
     """
-    #increment(env, opts, args)
     push(env, opts, args)
     pull(env, opts, args)
 
@@ -122,7 +117,6 @@ def clone(env, opts, args):
     with open(env.remote, 'w+') as remotefile:
         rconf.write(remotefile)
     pull(env, opts, remotes)
-    #increment(env, opts, remotes)
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -144,14 +138,13 @@ def main():
     (opts, args) = get_options()
     commands = {
         'init' : init,
-        #'increment' : increment,
         'push' : push,
         'pull' : pull,
         'remote' : remote_cmd,
         'sync' : sync,
         'clone' : clone,
-        #'list' : list_incr,
-        #'checkout' : checkout,
+        #'versions' : versions,
+        #'restore' : restore,
         #'daemon' : daemon,
         #'ping' : ping
     }
