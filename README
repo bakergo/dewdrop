@@ -34,10 +34,6 @@ NTH:
 How does this look to us?
 Subsystems:
     inotify for listening for file changes.
-	rdiff-backup for version tracking of files. Each node should keep track of
-		an independent history of a file. Benefit of this is that any given
-		corrupt node history won't fuck over everything, and there is no real
-		full-stop issue when things start to diverge and prune.
     rsync for synchronization between nodes.
 		rsync using --delay-updates and --partial-dir to make updates atomic
 		use --exclude .yafs to exclude our dropbox thing.
@@ -56,14 +52,17 @@ Command structure
 			.yafs/config -- config information
 			.yafs/remotes -- remote server configuration
 			.yafs/tmp/sync -- rsync tempdir
-
-	yafs increment -- create a new increment.
-	yafs push -- push changes to all remotes
+	yafs remote -- Keep track of remote servers
+	yafs push -- push changes to remotes
 	yafs pull -- pull changes from remotes
-	yafs list -- list all increments - can be done with rdiff-backup temporarily.
-	yafs checkout -- check out an increment
+	yafs sync -- push & pull from remotes
+	yafs clone -- Init, add remote & pull
 	yafs help -- print some fucking message
-	yafs sync -- run increment, then push changes to all remotes
+
+	to be added:
+	yafs version -- List all past versions of this file.
+	yafs restore -- restore a version of the file.
+	yafs checkout -- check out an increment
 	yafs daemon -- watch directories for changes & increment immediately
 	yafs ping -- check if the remote hosts are online
 
