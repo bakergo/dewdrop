@@ -6,8 +6,8 @@
 
 import os
 
-TREE_NAME = '.yafs'
-BACKUP_NAME = '.yafs/backup'
+TREE_NAME = '.ddr'
+BACKUP_NAME = '.ddr/backup'
 
 class BadWorkingTree(Exception):
     """ An exception that involves a working tree somehow. """

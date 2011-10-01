@@ -12,7 +12,7 @@ import os
 def rsync(src, dest, backup_dir=None):
     ''' Call rsync with the default parameters to sync the two folders '''
     cmd = ['rsync', '--delay-updates', 
-        '--partial-dir=%s' % ('.yafsync'),
+        '--partial-dir=%s' % ('.ddrsync'),
         '--exclude', tree.TREE_NAME,
         '-slurpt']
     if backup_dir:

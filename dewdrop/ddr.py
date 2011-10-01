@@ -16,16 +16,16 @@ import re
 #import tempfile
 #import sqlite3
 # TODO Break out each command to a git like command structure
-# TODO Handle configuration in ~/.yafs.d/config
-# TODO Maintain a global list of yafs dirs in .yafs.d
-# TODO Create a yafs-daemon to handle synchronizing each of the dirs.
+# TODO Handle configuration in ~/.ddr.d/config
+# TODO Maintain a global list of ddr dirs in .ddr.d
+# TODO Create a ddr-daemon to handle synchronizing each of the dirs.
 
 class InvalidArguments(Exception):
     """ An exception that signifies an error with a command """
     pass
 
 def init(env, opts, args):
-    """ Generate a yafs directory """
+    """ Generate a ddr directory """
     return tree.init(opts.directory)
 
 def remote_cmd(env, opts, args):
@@ -34,9 +34,9 @@ def remote_cmd(env, opts, args):
     """
     def usage():
         """ Print how to use this then raise an exception """
-        print 'usage: yafs remote add <name> <url>'
-        print '       yafs remote remove <name> ...'
-        print '       yafs remote list <name> ...'
+        print 'usage: ddr remote add <name> <url>'
+        print '       ddr remote remove <name> ...'
+        print '       ddr remote list <name> ...'
         raise InvalidArguments('remote')
     if args:
         command = args[0]
@@ -69,7 +69,7 @@ def remote_cmd(env, opts, args):
 def push(env, opts, args):
     """
     Push to each of the remote servers this directory.
-    Remote folders are set with the .yafs command
+    Remote folders are set with the .ddr command
     """
     remotes = remote.get_remotes(env)
     if args:
@@ -82,7 +82,7 @@ def push(env, opts, args):
 def pull(env, opts, args):
     """
     Pull from each of the remote servers of this directory.
-    Remote folders are set with the .yafs command
+    Remote folders are set with the .ddr command
     """
     remotes = remote.get_remotes(env)
     if args:
@@ -105,12 +105,12 @@ def clone(env, opts, args):
     that path
     """
     def usage():
-        print 'usage: yafs clone <url> ... [dir]'
+        print 'usage: ddr clone <url> ... [dir]'
         print 'Init, add a remote and pull'
         raise  InvalidArguments('clone')
     if len(args) == 1:
         remotes = args[0]
-        #opts.directory = opts.yafs_dir
+        #opts.directory = opts.ddr_dir
     elif len(args) >1:
         opts.directory = args[-1]
         remotes = args[0:-1]
@@ -144,7 +144,7 @@ def history(env, opts, args):
     """ Retrieve & list all known versions of a given file """
     def usage():
         ''' Print usage '''
-        print 'usage: yafs history <file> ...'
+        print 'usage: ddr history <file> ...'
         print 'List all known versions of a given file'
         InvalidArguments('history')
 
@@ -181,7 +181,7 @@ def restore(env, opts, args):
     ''' Retrieve a file given by history '''
     def usage():
         ''' Print usage '''
-        print 'usage: yafs restore <file> <version num>'
+        print 'usage: ddr restore <file> <version num>'
         print 'List all known versions of a given file'
         InvalidArguments('history')
     if len(args) == 2:
@@ -231,7 +231,7 @@ def get_options():
     optparser = optparse.OptionParser(
         usage='%prog [Options]',
         version='%prog 0.0')
-    optparser.add_option('--yafs-dir', type='string', default=os.getcwd(),
+    optparser.add_option('--ddr-dir', type='string', default=os.getcwd(),
         help='Specify the working directory.')
     (options, args) = optparser.parse_args()
     if (len(args) == 0 or args[0] == 'help'):
@@ -263,9 +263,9 @@ def main():
         if len(args) >1:
             opts.directory = args[-1]
         else:
-            opts.directory = opts.yafs_dir
+            opts.directory = opts.ddr_dir
     else:
-        opts.directory = tree.get_root(opts.yafs_dir)
+        opts.directory = tree.get_root(opts.ddr_dir)
         env = tree.Environment(opts.directory)
     try:
         if opts.command in commands:

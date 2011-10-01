@@ -36,7 +36,7 @@ Subsystems:
     inotify for listening for file changes.
     rsync for synchronization between nodes.
 		rsync using --delay-updates and --partial-dir to make updates atomic
-		use --exclude .yafs to exclude our dropbox thing.
+		use --exclude .dewdrop to exclude our dropbox thing.
 		use --delay-updates to make updates atomic.
 		use --delete-delay to delete files from the dest
 			this could cause data loss if they've got a pending update, but fu.
@@ -45,24 +45,24 @@ Subsystems:
 		Also, we could do something FUN and fucking only go one way and shit.
 
 Command structure
-	yafs init -- create a new yafs directory here.
+	ddr init -- create a new dewdrop directory here.
 		Also register something with crontab somehow. (in user crontab?)
-		yafs directory structure should be something like:
-			.yafs/backup/ -- file backups
-			.yafs/config -- config information
-			.yafs/remotes -- remote server configuration
-			.yafs/sync -- rsync tempdir
-	yafs remote -- Keep track of remote servers
-	yafs push -- push changes to remotes
-	yafs pull -- pull changes from remotes
-	yafs sync -- push & pull from remotes
-	yafs clone -- Init, add remote & pull
-	yafs help -- print some fucking message
-	yafs history -- List all past versions of this file.
-	yafs restore -- restore a version of the file.
+		dewdrop directory structure should be something like:
+			.ddr/backup/ -- file backups
+			.ddr/config -- config information
+			.ddr/remotes -- remote server configuration
+			.ddr/sync -- rsync tempdir
+	ddr remote -- Keep track of remote servers
+	ddr push -- push changes to remotes
+	ddr pull -- pull changes from remotes
+	ddr sync -- push & pull from remotes
+	ddr clone -- Init, add remote & pull
+	ddr help -- print some fucking message
+	ddr history -- List all past versions of this file.
+	ddr restore -- restore a version of the file.
 
 	to be added:
-	yafs increment -- When a more formal backup system is in place
-	yafs daemon -- watch directories for changes & increment immediately
-	yafs ping -- check if the remote hosts are online
+	ddr increment -- When a more formal backup system is in place
+	ddr daemon -- watch directories for changes & increment immediately
+	ddr ping -- check if the remote hosts are online
 

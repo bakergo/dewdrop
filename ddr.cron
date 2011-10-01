@@ -1,0 +1,15 @@
+#!/bin/sh
+# Cron script for syncing up dewdrop files.
+# Requires the file 'dewdrop-daemon-ok' in the current dir
+# -*- coding: utf-8 -*-
+# Copyright 2011, Greg Baker.
+
+DDR_CONFIG_DIR="$HOME/.ddr.d"
+
+for dir in "DDR_CONFIG_DIR"/* ; do
+    rawdir=`readlink -f "$dir"`
+    if [ -f "$rawdir/.ddr/dewdrop-daemon-ok" ] ; then
+        ddr --ddr-dir "$rawdir" sync
+    fi
+done
+
