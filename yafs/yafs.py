@@ -77,7 +77,7 @@ def push(env, opts, args):
     else:
         filt = lambda rmt: True
     for entry in filter(filt, remotes):
-        external.rsync(env.directory, entry.url)
+        external.rsync(env.directory, entry.url, backup_dir=env.backup)
 
 def pull(env, opts, args):
     """
