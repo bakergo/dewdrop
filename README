@@ -48,10 +48,10 @@ Command structure
 	yafs init -- create a new yafs directory here.
 		Also register something with crontab somehow. (in user crontab?)
 		yafs directory structure should be something like:
-			.yafs/backup/ -- rdiff backups
+			.yafs/backup/ -- file backups
 			.yafs/config -- config information
 			.yafs/remotes -- remote server configuration
-			.yafs/tmp/sync -- rsync tempdir
+			.yafs/sync -- rsync tempdir
 	yafs remote -- Keep track of remote servers
 	yafs push -- push changes to remotes
 	yafs pull -- pull changes from remotes
