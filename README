@@ -58,11 +58,11 @@ Command structure
 	yafs sync -- push & pull from remotes
 	yafs clone -- Init, add remote & pull
 	yafs help -- print some fucking message
+	yafs history -- List all past versions of this file.
+	yafs restore -- restore a version of the file.
 
 	to be added:
-	yafs version -- List all past versions of this file.
-	yafs restore -- restore a version of the file.
-	yafs checkout -- check out an increment
+	yafs increment -- When a more formal backup system is in place
 	yafs daemon -- watch directories for changes & increment immediately
 	yafs ping -- check if the remote hosts are online
 
