@@ -7,6 +7,7 @@
 import os
 
 TREE_NAME = '.yafs'
+BACKUP_NAME = '.yafs/backup'
 
 class BadWorkingTree(Exception):
     """ An exception that involves a working tree somehow. """

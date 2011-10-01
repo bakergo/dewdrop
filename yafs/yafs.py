@@ -5,13 +5,14 @@
 """ No bullshit distributed dropbox clone """
 
 import sys, os
+import shutil
 import optparse
 import lib.external as external
 import lib.remote as remote
 import lib.tree as tree
+import datetime
+import re
 
-#import datetime
-#import re
 #import tempfile
 #import sqlite3
 # TODO Break out each command to a git like command structure
@@ -33,9 +34,9 @@ def remote_cmd(env, opts, args):
     """
     def usage():
         """ Print how to use this then raise an exception """
-        print 'yafs remote add name rsync_path'
-        print 'yafs remote remove name'
-        print 'yafs remote list'
+        print 'usage: yafs remote add <name> <url>'
+        print '       yafs remote remove <name> ...'
+        print '       yafs remote list <name> ...'
         raise InvalidArguments('remote')
     if args:
         command = args[0]
@@ -103,12 +104,18 @@ def clone(env, opts, args):
     Creates a new folder with contents cloned from the given path, referencing
     that path
     """
+    def usage():
+        print 'usage: yafs clone <url> ... [dir]'
+        print 'Init, add a remote and pull'
+        raise  InvalidArguments('clone')
     if len(args) == 1:
         remotes = args[0]
         #opts.directory = opts.yafs_dir
     elif len(args) >1:
         opts.directory = args[-1]
         remotes = args[0:-1]
+    else:
+        usage()
     env = init(env, opts, args)
     with open(env.remote) as remotefile:
         rconf = remote.RemoteConfig(remotefile)
@@ -117,6 +124,107 @@ def clone(env, opts, args):
     with open(env.remote, 'w+') as remotefile:
         rconf.write(remotefile)
     pull(env, opts, remotes)
+
+def listhist(basename, dirpath):
+    ''' List files in the histtree '''
+    #suffix = datetime.datetime.now().strftime('.%Y%m%d-%H%M%S')
+    fpat = re.compile('^%s.%s%s-%s$' %(basename, '(\d{4})', '(\d{2})'*2,
+        '(\d{2})'*3))
+    fileid = 0
+    for histfile in os.listdir(dirpath):
+        fmatch = fpat.match(os.path.basename(histfile))
+        if fmatch and os.path.isfile(os.path.join(dirpath, histfile)):
+            fileid += 1
+            (year, month, day, hour, minute, second) = map(int, fmatch.groups())
+            modified = datetime.datetime(year, month, day, hour, minute,
+                    second)
+            yield (fileid, modified, histfile)
+
+def history(env, opts, args):
+    """ Retrieve & list all known versions of a given file """
+    def usage():
+        ''' Print usage '''
+        print 'usage: yafs history <file> ...'
+        print 'List all known versions of a given file'
+        InvalidArguments('history')
+
+    def showfile(fileid, path, modified):
+        ''' Formatter for file '''
+        print '{0: <8s} {1:s} {2:s}'.format(str(fileid), modified.ctime(),
+                os.path.relpath(path))
+
+    if args:
+        for filename in [os.path.abspath(x) for x in args]:
+            print 'looking for %s' % filename
+            # Find the path relative to directory()
+            fileid = 0
+            basepath = os.path.commonprefix([os.path.abspath(filename),
+                    env.directory])
+            relpath = filename[len(env.directory):len(filename)]
+            abspath = env.directory + relpath
+            basename = os.path.basename(filename)
+            histpath = os.path.dirname(env.backup + relpath)
+            if basepath != env.directory:
+                raise tree.BadWorkingTree("Filename %s isn't in %s"
+                        % (filename, directory))
+            if os.path.exists(abspath):
+                showfile('current', abspath,
+                        datetime.datetime.fromtimestamp(
+                                os.stat(abspath).st_mtime))
+            if os.path.isdir(histpath):
+                for (fileid, modified, fname) in listhist(basename, histpath):
+                    showfile(fileid, os.path.join(histpath, fname), modified)
+    else:
+        usage()
+
+def restore(env, opts, args):
+    ''' Retrieve a file given by history '''
+    def usage():
+        ''' Print usage '''
+        print 'usage: yafs restore <file> <version num>'
+        print 'List all known versions of a given file'
+        InvalidArguments('history')
+    if len(args) == 2:
+        (filename, version) = tuple(args)
+        if version == 'current':
+            # We're done.
+            return
+        # Find the path relative to directory()
+        abspath = os.path.abspath(filename)
+        basepath = os.path.commonprefix([os.path.abspath(filename),
+                env.directory])
+        relpath = abspath[len(env.directory):len(abspath)]
+        basename = os.path.basename(filename)
+        histpath = os.path.dirname(env.backup + relpath)
+
+        print 'histpath %s ' % histpath
+        if basepath != env.directory:
+            #TODO Replace with an OSError
+            raise tree.BadWorkingTree("Filename %s isn't in %s"
+                    % (filename, env.directory))
+        if not os.path.isdir(histpath):
+            raise tree.BadWorkingTree("No backups of %s exist" % (filename))
+        for (fileid, restmtime, restname) in listhist(basename, histpath):
+            if str(fileid) == version:
+                bupmtime = datetime.datetime.fromtimestamp(
+                        os.stat(abspath).st_mtime)
+                bupname = '%s.%s' % (basename,
+                                     bupmtime.strftime('%Y%m%d-%H%M%S'))
+                buppath  = os.path.join(histpath, bupname)
+                restpath = os.path.join(histpath, restname)
+                print "Moving newer file %s to %s" % (
+                        os.path.relpath(abspath),
+                        os.path.relpath(buppath))
+                shutil.copy2(abspath, buppath)
+                print "Restoring file %s to %s" % (
+                        os.path.relpath(restpath),
+                        os.path.relpath(abspath))
+                shutil.copy2(restpath, abspath)
+                return
+        raise tree.BadWorkingTree("Filename %s version %s isn't in %s"
+            % (filename, version, env.directory))
+    else:
+        usage()
 
 def get_options():
     """ Retrieve and parse command-line options into options and arguments """
@@ -143,8 +251,8 @@ def main():
         'remote' : remote_cmd,
         'sync' : sync,
         'clone' : clone,
-        #'versions' : versions,
-        #'restore' : restore,
+        'history' : history,
+        'restore' : restore,
         #'daemon' : daemon,
         #'ping' : ping
     }
