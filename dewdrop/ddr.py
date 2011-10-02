@@ -192,13 +192,11 @@ def restore(env, opts, args):
             return
         # Find the path relative to directory()
         abspath = os.path.abspath(filename)
-        basepath = os.path.commonprefix([os.path.abspath(filename),
-                env.directory])
+        basepath = os.path.commonprefix([abspath, env.directory])
         relpath = abspath[len(env.directory):len(abspath)]
         basename = os.path.basename(filename)
         histpath = os.path.dirname(env.backup + relpath)
 
-        print 'histpath %s ' % histpath
         if basepath != env.directory:
             #TODO Replace with an OSError
             raise tree.BadWorkingTree("Filename %s isn't in %s"
@@ -213,13 +211,16 @@ def restore(env, opts, args):
                                      bupmtime.strftime('%Y%m%d-%H%M%S'))
                 buppath  = os.path.join(histpath, bupname)
                 restpath = os.path.join(histpath, restname)
-                print "Moving newer file %s to %s" % (
-                        os.path.relpath(abspath),
-                        os.path.relpath(buppath))
-                shutil.copy2(abspath, buppath)
+                if os.path.isfile(abspath):
+                    print "Moving newer file %s to %s" % (
+                            os.path.relpath(abspath),
+                            os.path.relpath(buppath))
+                    shutil.copy2(abspath, buppath)
                 print "Restoring file %s to %s" % (
                         os.path.relpath(restpath),
                         os.path.relpath(abspath))
+                if not os.path.isdir(os.path.dirname(abspath)):
+                    os.makedirs(os.path.dirname(abspath))
                 shutil.copy2(restpath, abspath)
                 return
         raise tree.BadWorkingTree("Filename %s version %s isn't in %s"
