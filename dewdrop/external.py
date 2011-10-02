@@ -6,7 +6,7 @@
 
 import subprocess
 import datetime
-import lib.tree as tree
+import tree
 import os
 
 def rsync(src, dest, backup_dir=None):

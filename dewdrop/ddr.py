@@ -4,12 +4,13 @@
 
 """ No bullshit distributed dropbox clone """
 
-import sys, os
+import sys
+import os
 import shutil
 import optparse
-import lib.external as external
-import lib.remote as remote
-import lib.tree as tree
+import external
+import remote
+import tree
 import datetime
 import re
 
