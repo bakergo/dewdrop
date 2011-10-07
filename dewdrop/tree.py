@@ -25,6 +25,14 @@ class Environment:
         self.backup = os.path.join(self.tree, 'backup')
         self.remote = os.path.join(self.tree, 'remotes')
 
+    def relpath(self, path):
+        ''' Return path relative to the current tree '''
+        basepath = os.path.commonprefix([os.path.abspath(filename), env.directory])
+        if basepath != self.directory:
+            raise tree.BadWorkingTree("Filename %s isn't in %s"
+                    % (filename, directory))
+        return filename[len(env.directory):len(filename)]
+
 def is_tree(directory):
     """ Determine if we're in a working tree. """
     if not os.path.exists(directory):

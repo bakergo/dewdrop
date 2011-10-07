@@ -159,19 +159,13 @@ def history(env, opts, args):
             print 'looking for %s' % filename
             # Find the path relative to directory()
             fileid = 0
-            basepath = os.path.commonprefix([os.path.abspath(filename),
-                    env.directory])
-            relpath = filename[len(env.directory):len(filename)]
-            abspath = env.directory + relpath
+            relpath = env.relpath(filename)
             basename = os.path.basename(filename)
             histpath = os.path.dirname(env.backup + relpath)
-            if basepath != env.directory:
-                raise tree.BadWorkingTree("Filename %s isn't in %s"
-                        % (filename, directory))
-            if os.path.exists(abspath):
-                showfile('current', abspath,
+            if os.path.exists(filename):
+                showfile('current', filename,
                         datetime.datetime.fromtimestamp(
-                                os.stat(abspath).st_mtime))
+                                os.stat(filename).st_mtime))
             if os.path.isdir(histpath):
                 for (fileid, modified, fname) in listhist(basename, histpath):
                     showfile(fileid, os.path.join(histpath, fname), modified)
@@ -192,15 +186,10 @@ def restore(env, opts, args):
             return
         # Find the path relative to directory()
         abspath = os.path.abspath(filename)
-        basepath = os.path.commonprefix([abspath, env.directory])
-        relpath = abspath[len(env.directory):len(abspath)]
         basename = os.path.basename(filename)
+        relpath = env.relpath(abspath)
         histpath = os.path.dirname(env.backup + relpath)
 
-        if basepath != env.directory:
-            #TODO Replace with an OSError
-            raise tree.BadWorkingTree("Filename %s isn't in %s"
-                    % (filename, env.directory))
         if not os.path.isdir(histpath):
             raise tree.BadWorkingTree("No backups of %s exist" % (filename))
         for (fileid, restmtime, restname) in listhist(basename, histpath):
