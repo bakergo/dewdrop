@@ -179,6 +179,17 @@ def restore(env, opts, args):
         print 'usage: ddr restore <file> <version num>'
         print 'List all known versions of a given file'
         InvalidArguments('history')
+
+    def copy(source, dest):
+        ''' Copy a source file to the destination no matter what. '''
+        if os.path.isfile(source):
+            print "Moving file from %s to %s" % (
+                    os.path.relpath(source),
+                    os.path.relpath(dest))
+            if not os.path.isdir(os.path.dirname(dest)):
+                os.makedirs(os.path.dirname(dest))
+            shutil.copy2(source, dest)
+
     if len(args) == 2:
         (filename, version) = tuple(args)
         if version == 'current':
@@ -194,23 +205,15 @@ def restore(env, opts, args):
             raise tree.BadWorkingTree("No backups of %s exist" % (filename))
         for (fileid, restmtime, restname) in listhist(basename, histpath):
             if str(fileid) == version:
-                bupmtime = datetime.datetime.fromtimestamp(
-                        os.stat(abspath).st_mtime)
+                # File.txt.20110102-133026
                 bupname = '%s.%s' % (basename,
-                                     bupmtime.strftime('%Y%m%d-%H%M%S'))
+                        datetime.datetime.fromtimestamp(
+                            os.stat(abspath).st_mtime
+                            .strftime('%Y%m%d-%H%M%S')))
                 buppath  = os.path.join(histpath, bupname)
                 restpath = os.path.join(histpath, restname)
-                if os.path.isfile(abspath):
-                    print "Moving newer file %s to %s" % (
-                            os.path.relpath(abspath),
-                            os.path.relpath(buppath))
-                    shutil.copy2(abspath, buppath)
-                print "Restoring file %s to %s" % (
-                        os.path.relpath(restpath),
-                        os.path.relpath(abspath))
-                if not os.path.isdir(os.path.dirname(abspath)):
-                    os.makedirs(os.path.dirname(abspath))
-                shutil.copy2(restpath, abspath)
+                copy(abspath, buppath)
+                copy(restpath, abspath)
                 return
         raise tree.BadWorkingTree("Filename %s version %s isn't in %s"
             % (filename, version, env.directory))
