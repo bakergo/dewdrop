@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 # Copyright 2011, Greg Baker.
 
-""" No bullshit distributed dropbox clone """
+""" Completely bullshit distributed dropbox clone """
+VERSION = (0,1,0)
 
 import sys
 import os
@@ -241,9 +242,10 @@ def get_options():
     """ 
     Retrieve and parse command-line options into options and arguments 
     """
+    version = "%%prog %d.%d.%d" % VERSION
     optparser = optparse.OptionParser(
         usage='%prog [Options]',
-        version='%prog 0.0')
+        version=version)
     optparser.add_option('--ddr-dir', type='string', default=os.getcwd(),
         help='Specify the working directory.')
     subcommands = optparse.OptionGroup(optparser, "Subcommands",
