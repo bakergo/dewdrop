@@ -25,24 +25,44 @@ class InvalidArguments(Exception):
     """ An exception that signifies an error with a command """
     pass
 
+COMMANDS = {}
+def subcommand(cmd):
+    def wrapper(func):
+        COMMANDS[cmd] = func
+        docs = func.__doc__.split('\n')
+        func.help = docs[1].strip()
+        func.cmd = cmd
+        func.usage = [line.strip() for line in docs[2:-1]]
+        return func;
+    return wrapper
+
+def usage(func):
+    prefix = 'usage:'
+    for line in func.usage:
+        print '%s %s' % (prefix, line)
+        prefix = '      '
+    raise InvalidArguments(func.cmd)
+
+@subcommand('init')
 def init(env, opts, args):
-    """ Generate a ddr directory """
+    """ 
+    Generate a new ddr directory
+    init
+    """
     return tree.init(opts.directory)
 
+@subcommand('remote')
 def remote_cmd(env, opts, args):
     """
     Add or remove references to remote servers.
+    remote add <name> <url>
+    remote remove <name> ...
+    remote list [<name> ...]
     """
-    def usage():
-        """ Print how to use this then raise an exception """
-        print 'usage: ddr remote add <name> <url>'
-        print '       ddr remote remove <name> ...'
-        print '       ddr remote list <name> ...'
-        raise InvalidArguments('remote')
     if args:
         command = args[0]
     else:
-        usage()
+        usage(remote_cmd)
 
     with open(env.remote) as remotefile:
         rconf = remote.RemoteConfig(remotefile)
@@ -53,24 +73,25 @@ def remote_cmd(env, opts, args):
             with open(env.remote, 'w+') as remotefile:
                 rconf.write(remotefile)
         else:
-            usage()
+            usage(remote_cmd)
     elif command == 'remove': 
         if len(args) >= 2:
             rconf.remove(args[1])
             with open(env.remote, 'w+') as remotefile:
                 rconf.write(remotefile)
         else:
-            usage()
+            usage(remote_cmd)
     elif command == 'list':
         for entry in rconf.remotes:
             print "%s %s" % (entry.name, entry.url)
     else:
-        usage()
+        usage(remote_cmd)
 
+@subcommand('push')
 def push(env, opts, args):
     """
     Push to each of the remote servers this directory.
-    Remote folders are set with the .ddr command
+    push [<name> ...]
     """
     remotes = remote.get_remotes(env)
     if args:
@@ -80,10 +101,11 @@ def push(env, opts, args):
     for entry in filter(filt, remotes):
         external.rsync(env.directory, entry.url, backup_dir=env.backup)
 
+@subcommand('pull')
 def pull(env, opts, args):
     """
     Pull from each of the remote servers of this directory.
-    Remote folders are set with the .ddr command
+    pull [<name> ...]
     """
     remotes = remote.get_remotes(env)
     if args:
@@ -93,22 +115,21 @@ def pull(env, opts, args):
     for entry in filter(filt, remotes):
         external.rsync(entry.url, env.directory, backup_dir=env.backup)
 
+@subcommand('sync')
 def sync(env, opts, args):
     """ 
-    Synchronize this folder with each of the others.
+    Synchronize this folder with each of the others. Alias for push & pull
+    sync
     """
     push(env, opts, args)
     pull(env, opts, args)
 
+@subcommand('clone')
 def clone(env, opts, args):
     """
-    Creates a new folder with contents cloned from the given path, referencing
-    that path
+    Creates a new folder with contents cloned from the given path
+    clone <url> ... [<dir>]
     """
-    def usage():
-        print 'usage: ddr clone <url> ... [dir]'
-        print 'Init, add a remote and pull'
-        raise  InvalidArguments('clone')
     if len(args) == 1:
         remotes = args[0]
         #opts.directory = opts.ddr_dir
@@ -116,7 +137,7 @@ def clone(env, opts, args):
         opts.directory = args[-1]
         remotes = args[0:-1]
     else:
-        usage()
+        usage(clone)
     env = init(env, opts, args)
     with open(env.remote) as remotefile:
         rconf = remote.RemoteConfig(remotefile)
@@ -141,14 +162,12 @@ def listhist(basename, dirpath):
                     second)
             yield (fileid, modified, histfile)
 
+@subcommand('history')
 def history(env, opts, args):
-    """ Retrieve & list all known versions of a given file """
-    def usage():
-        ''' Print usage '''
-        print 'usage: ddr history <file> ...'
-        print 'List all known versions of a given file'
-        InvalidArguments('history')
-
+    """
+    Retrieve & list all known versions of a given file
+    history <file> ...
+    """
     def showfile(fileid, path, modified):
         ''' Formatter for file '''
         print '{0: <8s} {1:s} {2:s}'.format(str(fileid), modified.ctime(),
@@ -170,16 +189,14 @@ def history(env, opts, args):
                 for (fileid, modified, fname) in listhist(basename, histpath):
                     showfile(fileid, os.path.join(histpath, fname), modified)
     else:
-        usage()
+        usage(history)
 
+@subcommand('restore')
 def restore(env, opts, args):
-    ''' Retrieve a file given by history '''
-    def usage():
-        ''' Print usage '''
-        print 'usage: ddr restore <file> <version num>'
-        print 'List all known versions of a given file'
-        InvalidArguments('history')
-
+    '''
+    Retrieve a file given by history
+    restore <file> <version num>
+    '''
     def copy(source, dest):
         ''' Copy a source file to the destination no matter what. '''
         if os.path.isfile(source):
@@ -218,41 +235,41 @@ def restore(env, opts, args):
         raise tree.BadWorkingTree("Filename %s version %s isn't in %s"
             % (filename, version, env.directory))
     else:
-        usage()
+        usage(restore)
 
 def get_options():
-    """ Retrieve and parse command-line options into options and arguments """
+    """ 
+    Retrieve and parse command-line options into options and arguments 
+    """
     optparser = optparse.OptionParser(
         usage='%prog [Options]',
         version='%prog 0.0')
     optparser.add_option('--ddr-dir', type='string', default=os.getcwd(),
         help='Specify the working directory.')
+    subcommands = optparse.OptionGroup(optparser, "Subcommands",
+            "These arguments dictate the possible different actions that "
+            "you can perform when using dewdrop")
+    optparser.add_option_group(subcommands)
+
     (options, args) = optparser.parse_args()
     if (len(args) == 0 or args[0] == 'help'):
         optparser.print_help()
+        print
+        for command in COMMANDS:
+                print "  %-10s %s" % (COMMANDS[command].cmd, 
+                        COMMANDS[command].help)
         sys.exit(0)
     command = args[0]
     options.command = command
     return (options, args[1:])
 
 def main():
-    """Run through the arguments, then run through user input until we're out"""
+    """
+    Run through the arguments, then run through user input until we're out
+    """
     (opts, args) = get_options()
-    commands = {
-        'init' : init,
-        'push' : push,
-        'pull' : pull,
-        'remote' : remote_cmd,
-        'sync' : sync,
-        'clone' : clone,
-        'history' : history,
-        'restore' : restore,
-        #'daemon' : daemon,
-        #'ping' : ping
-    }
-
     env = None
-    create_commands = set(['init', 'clone'])
+    create_commands = set(('init', 'clone'))
     if opts.command in create_commands:
         if len(args) >1:
             opts.directory = args[-1]
@@ -262,8 +279,8 @@ def main():
         opts.directory = tree.get_root(opts.ddr_dir)
         env = tree.Environment(opts.directory)
     try:
-        if opts.command in commands:
-            commands[opts.command](env, opts, args)
+        if opts.command in COMMANDS:
+            COMMANDS[opts.command](env, opts, args)
         else:
             pass
             # Try a subprocess?
