@@ -1,68 +1,63 @@
-This serves as a list of requirements for a personal dropbox clone.
+Dewdrop
+======= 
 
-1) No concept of a server or client.
-    Each actor in this system should be the same. No 'server' should exist
-2) An arbitrary number of clients can receive changes from any given node.
-3) Multiple folders on a single machine should be kept track of independently
-        Each can have multiple differing clients
-        Each can be synchronized independently.
-        Each can be configured independently.
-        Folder location should be local to the machine.
-4) Nodes should be able to instantly get changes from other nodes.
-        Can we do this without pushing changes?
-        How do we prevent a cyclical push? do we care?
-5) Offline nodes need to be able to sync the backlog of changes when they come
-    online.
-6) Expired data should be pruned.
-        Expired could mean after X amount of time, or X changes, or X size...
-7) Mutually edited files should be caught and reported, or at least recoverable
-    with no interruption in service.
-8) Because this is to work on multiple machines, we should be ownership, group,
-    etc. agnostic.
-9) Because forcing people to install rdiff-backup sucks, backing up should use
-    a more NIH-like solution, where we split files up with a rolling checksum,
-    then backup the files using their fragmented chunks. See bup, librsync
-    for more details. [bup suffers from an inability to prune, which is 90%
-    of why I wrote this]
+Dewdrop is a program built to help synchronize multiple folders with those on
+remote machines. The utility of it is mostly inspired by dropbox, and the
+interface is heavily influenced by git.
 
-NTH:
-    All files encrypted to access.
-    Full change-for-change history of all files everywhere, even across rebases
-        and other mucking with our history locally.
-    git-like command structure for funtime scriptableness.
-        (sync [opts] command [opts] -> sync-command [opts])
-How does this look to us?
-Subsystems:
-    inotify for listening for file changes.
-    rsync for synchronization between nodes.
-		rsync using --delay-updates and --partial-dir to make updates atomic
-		use --exclude .dewdrop to exclude our dropbox thing.
-		use --delay-updates to make updates atomic.
-		use --delete-delay to delete files from the dest
-			this could cause data loss if they've got a pending update, but fu.
-		use -stlurp to only update out-of-date ones.
-		Note that deletions are fucking dangerous as shit this way (we should have history, so meh).
-		Also, we could do something FUN and fucking only go one way and shit.
+You might want to use dewdrop if you're bored, insane, have your data already
+backed up with something better (I recommend using `bup`) and you feel like
+experimenting with a toy project.
 
-Command structure
-	ddr init -- create a new dewdrop directory here.
-		Also register something with crontab somehow. (in user crontab?)
-		dewdrop directory structure should be something like:
-			.ddr/backup/ -- file backups
-			.ddr/config -- config information
-			.ddr/remotes -- remote server configuration
-			.ddr/sync -- rsync tempdir
-	ddr remote -- Keep track of remote servers
-	ddr push -- push changes to remotes
-	ddr pull -- pull changes from remotes
-	ddr sync -- push & pull from remotes
-	ddr clone -- Init, add remote & pull
-	ddr help -- print some fucking message
-	ddr history -- List all past versions of this file.
-	ddr restore -- restore a version of the file.
+You might want to avoid dewdrop if you want to contribute to a more developed
+and actively maintained project.
 
-	to be added:
-	ddr increment -- When a more formal backup system is in place
-	ddr daemon -- watch directories for changes & increment immediately
-	ddr ping -- check if the remote hosts are online
+Getting started
+---------------
+
+In order to get dewdrop, check out the source from git
+
+<pre>
+git clone https://github.com/bakergo/dewdrop
+</pre>
+
+### Installation ###
+
+To install, run the included setup script
+
+<pre>
+./setup.py build
+./setup.py install
+</pre>
+
+### Initializing ###
+
+Initializing a folder to synchronize is as simple as running the init command
+<pre>
+ddr init
+ddr init /path/to/define/a/folder/
+</pre>
+
+### Remotes ###
+
+The ddr remote command will identify a remote server to synchronize against.
+Since dewdrop uses rsync for most of its operations, this command takes an
+rsync url as a parameter. The remote commands are fairly similar to that used
+by git.
+
+<pre>
+ddr remote add user-sync ssh://user@example.com/~/my/sync/folder
+ddr remote remove user-sync 
+</pre>
+
+### Synchronizing ###
+
+In order to synchronize with the remote folder, you can use push, pull, or sync
+The sync command is the same as doing a push, then a pull.
+<pre>
+ddr push user-sync
+ddr sync
+</pre>
+
+There are other commands as well, experiment with them.
 

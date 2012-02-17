@@ -3,17 +3,17 @@
 # Copyright 2011, Greg Baker.
 
 """ Completely bullshit distributed dropbox clone """
-VERSION = (0,1,0)
 
 import sys
 import os
 import shutil
 import optparse
-import external
-import remote
-import tree
 import datetime
 import re
+import dewdrop
+import dewdrop.external as external
+import dewdrop.remote as remote
+import dewdrop.tree as tree
 
 #import tempfile
 #import sqlite3
@@ -242,7 +242,7 @@ def get_options():
     """ 
     Retrieve and parse command-line options into options and arguments 
     """
-    version = "%%prog %d.%d.%d" % VERSION
+    version = "%%prog %d.%d.%d" % dewdrop.VERSION
     optparser = optparse.OptionParser(
         usage='%prog [Options]',
         version=version)
