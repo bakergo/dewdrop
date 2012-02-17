@@ -30,6 +30,9 @@ To install, run the included setup script
 ./setup.py install
 </pre>
 
+Usage
+-----
+
 ### Initializing ###
 
 Initializing a folder to synchronize is as simple as running the init command
